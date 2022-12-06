@@ -1,8 +1,10 @@
+//go:build arm
+// +build arm
 package native
 
 import (
 	"debug/elf"
-	"encoding/binary"
+	"errors"
 	"fmt"
 	"golang.org/x/arch/arm/armasm"
 	"math/bits"
@@ -10,10 +12,17 @@ import (
 	"unsafe"
 
 	sys "golang.org/x/sys/unix"
+	"encoding/binary"
 
 	"github.com/go-delve/delve/pkg/proc"
 	"github.com/go-delve/delve/pkg/proc/linutil"
 )
+
+type watchpointState struct {
+	num      uint8
+	debugVer uint8
+	words    []uint64
+}
 
 func (t *nativeThread) fpRegisters() ([]proc.Register, []byte, error) {
 	var err error
@@ -72,7 +81,7 @@ func (t *nativeThread) resolvePC(regs proc.Registers) ([]uint64, error) {
 		case armasm.Imm:
 			nextPcs = append(nextPcs, uint64(arg))
 		case armasm.Reg:
-			pc, err := regs.Get(int(arg))
+			pc, err := regs.(*linutil.ARMRegisters).Get(int(arg))
 			if err != nil {
 				return nil, err
 			}
@@ -82,7 +91,7 @@ func (t *nativeThread) resolvePC(regs proc.Registers) ([]uint64, error) {
 		}
 	case armasm.POP:
 		if regList, ok := nextInstr.Args[0].(armasm.RegList); ok && (regList&(1<<uint(armasm.PC)) != 0) {
-			pc, err := regs.Get(int(armasm.SP))
+			pc, err := regs.(*linutil.ARMRegisters).Get(int(armasm.SP))
 			if err != nil {
 				return nil, err
 			}
@@ -105,13 +114,13 @@ func (t *nativeThread) resolvePC(regs proc.Registers) ([]uint64, error) {
 		if reg, ok := nextInstr.Args[0].(armasm.Reg); ok && reg == armasm.PC {
 			switch arg := nextInstr.Args[1].(type) {
 			case armasm.Mem:
-				pc, err := regs.Get(int(arg.Base))
+				pc, err := regs.(*linutil.ARMRegisters).Get(int(arg.Base))
 				if err != nil {
 					return nil, err
 				}
 				if arg.Mode == armasm.AddrOffset || arg.Mode == armasm.AddrPreIndex {
 					if arg.Sign != 0 {
-						idx, err := regs.Get(int(arg.Index))
+						idx, err := regs.(*linutil.ARMRegisters).Get(int(arg.Index))
 						if err != nil {
 							return nil, err
 						}
@@ -153,7 +162,7 @@ func (t *nativeThread) resolvePC(regs proc.Registers) ([]uint64, error) {
 				case armasm.Imm:
 					pc += uint64(arg)
 				case armasm.Reg:
-					regVal, err := regs.Get(int(arg))
+					regVal, err := regs.(*linutil.ARMRegisters).Get(int(arg))
 					if err != nil {
 						return nil, err
 					}
@@ -235,3 +244,88 @@ func (t *nativeThread) singleStep() (err error) {
 		}
 	}
 }
+
+func (t *nativeThread) getWatchpoints() (*watchpointState, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (t *nativeThread) writeHardwareBreakpoint(addr uint64, wtype proc.WatchType, idx uint8) error {
+	return errors.New("Not implemented")
+}
+// TODO
+// func (t *nativeThread) writeHardwareBreakpoint(addr uint64, wtype proc.WatchType, idx uint8) error {
+// 	wpstate, err := t.getWatchpoints()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if idx >= wpstate.num {
+// 		return errors.New("hardware breakpoints exhausted")
+// 	}
+
+// 	const (
+// 		readBreakpoint  = 0x1
+// 		writeBreakpoint = 0x2
+// 		lenBitOffset    = 5
+// 		typeBitOffset   = 3
+// 		privBitOffset   = 1
+// 	)
+
+// 	var typ uint64
+// 	if wtype.Read() {
+// 		typ |= readBreakpoint
+// 	}
+// 	if wtype.Write() {
+// 		typ |= writeBreakpoint
+// 	}
+
+// 	len := uint64((1 << wtype.Size()) - 1) // arm wants the length expressed as address bitmask
+
+// 	priv := uint64(3)
+
+// 	ctrl := (len << lenBitOffset) | (typ << typeBitOffset) | (priv << privBitOffset) | 1
+// 	wpstate.set(idx, addr, ctrl)
+
+// 	return t.setWatchpoints(wpstate)
+// }
+
+//TODO
+func (t *nativeThread) clearHardwareBreakpoint(addr uint64, wtype proc.WatchType, idx uint8) error {
+	return errors.New("not implemented")
+}
+
+// func (t *nativeThread) clearHardwareBreakpoint(addr uint64, wtype proc.WatchType, idx uint8) error {
+// 	wpstate, err := t.getWatchpoints()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if idx >= wpstate.num {
+// 		return errors.New("hardware breakpoints exhausted")
+// 	}
+// 	wpstate.set(idx, 0, 0)
+// 	return t.setWatchpoints(wpstate)
+// }
+
+func (t *nativeThread) findHardwareBreakpoint() (*proc.Breakpoint, error) {
+	return nil, errors.New("not implemented")
+}
+// func (t *nativeThread) findHardwareBreakpoint() (*proc.Breakpoint, error) {
+// 	var siginfo ptraceSiginfoArm64
+// 	var err error
+// 	t.dbp.execPtraceFunc(func() {
+// 		_, _, err = syscall.Syscall6(syscall.SYS_PTRACE, sys.PTRACE_GETSIGINFO, uintptr(t.ID), 0, uintptr(unsafe.Pointer(&siginfo)), 0, 0)
+// 	})
+// 	if err != syscall.Errno(0) {
+// 		return nil, err
+// 	}
+// 	if siginfo.signo != uint32(sys.SIGTRAP) || (siginfo.code&0xffff) != _TRAP_HWBKPT {
+// 		return nil, nil
+// 	}
+
+// 	for _, bp := range t.dbp.Breakpoints().M {
+// 		if bp.WatchType != 0 && siginfo.addr >= bp.Addr && siginfo.addr < bp.Addr+uint32(bp.WatchType.Size()) {
+// 			return bp, nil
+// 		}
+// 	}
+
+// 	return nil, fmt.Errorf("could not find hardware breakpoint for address %#x", siginfo.addr)
+// }

@@ -1570,6 +1570,7 @@ func (bi *BinaryInfo) setGStructOffsetElf(image *Image, exe *elf.File, wg *sync.
 		bi.gStructOffset = ^(memsz) + 1 + tlsg.Value // -tls.Memsz + tlsg.Value
 
 	case elf.EM_AARCH64:
+	case elf.EM_ARM:
 		tlsg := getSymbol(image, bi.logger, exe, "runtime.tls_g")
 		if tlsg == nil || tls == nil {
 			bi.gStructOffset = 2 * uint64(bi.Arch.PtrSize())
@@ -1580,7 +1581,7 @@ func (bi *BinaryInfo) setGStructOffsetElf(image *Image, exe *elf.File, wg *sync.
 
 	default:
 		// we should never get here
-		panic("architecture not supported")
+		panic(fmt.Sprintf("architecture not supported:%d", exe.Machine))
 	}
 }
 

@@ -275,6 +275,7 @@ func (it *stackIterator) newStackframe(ret, retaddr uint64) Stackframe {
 	} else {
 		it.regs.FrameBase = it.frameBase(fn)
 	}
+
 	r := Stackframe{Current: Location{PC: it.pc, File: f, Line: l, Fn: fn}, Regs: it.regs, Ret: ret, addrret: retaddr, stackHi: it.stackhi, SystemStack: it.systemstack, lastpc: it.pc}
 	if r.Regs.Reg(it.regs.PCRegNum) == nil {
 		r.Regs.AddReg(it.regs.PCRegNum, op.DwarfRegisterFromUint64(it.pc))
