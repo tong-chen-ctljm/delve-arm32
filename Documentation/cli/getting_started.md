@@ -5,6 +5,12 @@ not used to using a source level debugger in a compiled language. This document
 will provide all the information you need to get started debugging your Go
 programs.
 
+## Build for arm32 platform
+
+```
+env CC=arm-linux-gnueabihf-gcc CGO_ENABLED=1 GOOS=linux GOARCH=arm GOARM=7 go build  -gcflags=all=-N -v github.com/go-delve/delve/cmd/dlv
+```
+
 ## Debugging 'main' packages
 
 The first CLI subcommand we will explore is `debug`. This subcommand can be run
@@ -27,7 +33,7 @@ For example given this project layout:
 
 If you are in the directory `github.com/me/foo/cmd/foo` you can simply run `dlv debug`
 from the command line. From anywhere else, say the project root, you can simply
-provide the package: `dlv debug github.com/me/foo/cmd/foo`. To pass flags to your program 
+provide the package: `dlv debug github.com/me/foo/cmd/foo`. To pass flags to your program
 separate them with `--`: `dlv debug github.com/me/foo/cmd/foo -- -arg1 value`.
 
 Invoking that command will cause Delve to compile the program in a way most
@@ -47,13 +53,13 @@ Breakpoint 1 set at 0x49ecf3 for main.main() ./test.go:5
 (dlv) continue
 > main.main() ./test.go:5 (hits goroutine(1):1 total:1) (PC: 0x49ecf3)
      1:	package main
-     2:	
+     2:
      3:	import "fmt"
-     4:	
+     4:
 =>   5:	func main() {
      6:		fmt.Println("delve test")
      7:	}
-(dlv) 
+(dlv)
 ```
 
 ## Debugging tests
@@ -73,13 +79,13 @@ Breakpoint 1 set at 0x536513 for /home/me/go/src/github.com/me/foo/pkg/baz/test.
 (dlv) continue
 > /home/me/go/src/github.com/me/foo/pkg/baz/test.TestHi() ./bar_test.go:5 (hits goroutine(5):1 total:1) (PC: 0x536513)
      1:	package baz
-     2:	
+     2:
      3:	import "testing"
-     4:	
+     4:
 =>   5:	func TestHi(t *testing.T) {
      6:		t.Fatal("implement me!")
      7:	}
-(dlv) 
+(dlv)
 ```
 
 As you can see, we began debugging the test binary, found our test function via
