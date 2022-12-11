@@ -78,7 +78,7 @@ func resolveCallArgARM(inst *armasm.Inst, instAddr uint64, currentGoroutine bool
 			return nil
 		}
 	case armasm.PCRel:
-		pc = instAddr + uint64(arg)
+		pc = instAddr + uint64(arg) + 8
 	default:
 		return nil
 	}

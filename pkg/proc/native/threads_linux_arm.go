@@ -1,18 +1,21 @@
 //go:build arm
 // +build arm
+
 package native
 
 import (
 	"debug/elf"
 	"errors"
 	"fmt"
-	"golang.org/x/arch/arm/armasm"
 	"math/bits"
 	"syscall"
 	"unsafe"
 
-	sys "golang.org/x/sys/unix"
+	"golang.org/x/arch/arm/armasm"
+
 	"encoding/binary"
+
+	sys "golang.org/x/sys/unix"
 
 	"github.com/go-delve/delve/pkg/proc"
 	"github.com/go-delve/delve/pkg/proc/linutil"
@@ -231,15 +234,20 @@ func (t *nativeThread) singleStep() (err error) {
 		if err != nil {
 			return err
 		}
-		if (status == nil || status.Exited()) && wpid == t.dbp.pid {
-			t.dbp.postExit()
-			rs := 0
-			if status != nil {
-				rs = status.ExitStatus()
+		if status == nil || status.Exited() {
+			if wpid == t.dbp.pid {
+				t.dbp.postExit()
+				rs := 0
+				if status != nil {
+					rs = status.ExitStatus()
+				}
+				return proc.ErrProcessExited{Pid: t.dbp.pid, Status: rs}
 			}
-			return proc.ErrProcessExited{Pid: t.dbp.pid, Status: rs}
+			delete(t.dbp.threads, wpid)
+			return nil
 		}
-		if wpid == t.ID && status.StopSignal() == sys.SIGTRAP {
+		if wpid == t.ID {
+			fmt.Printf("singleStep same threadid, stopSignal=%d\n", status.StopSignal())
 			return nil
 		}
 	}
@@ -252,6 +260,7 @@ func (t *nativeThread) getWatchpoints() (*watchpointState, error) {
 func (t *nativeThread) writeHardwareBreakpoint(addr uint64, wtype proc.WatchType, idx uint8) error {
 	return errors.New("Not implemented")
 }
+
 // TODO
 // func (t *nativeThread) writeHardwareBreakpoint(addr uint64, wtype proc.WatchType, idx uint8) error {
 // 	wpstate, err := t.getWatchpoints()
@@ -308,6 +317,7 @@ func (t *nativeThread) clearHardwareBreakpoint(addr uint64, wtype proc.WatchType
 func (t *nativeThread) findHardwareBreakpoint() (*proc.Breakpoint, error) {
 	return nil, errors.New("not implemented")
 }
+
 // func (t *nativeThread) findHardwareBreakpoint() (*proc.Breakpoint, error) {
 // 	var siginfo ptraceSiginfoArm64
 // 	var err error
